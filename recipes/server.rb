@@ -67,6 +67,31 @@ if platform_family?('debian')
     group  node['mysql']['root_group']
     mode   '0600'
   end
+
+  skip_federated = case node['platform']
+                   when 'fedora', 'ubuntu', 'amazon'
+                     true
+                   when 'centos', 'redhat', 'scientific'
+                     node['platform_version'].to_f < 6.0
+                   else
+                     false
+                   end
+
+  template "#{node['mysql']['conf_dir']}/my.cnf" do
+    source 'my.cnf.erb'
+    owner 'root' unless platform? 'windows'
+    group node['mysql']['root_group'] unless platform?('windows')
+    mode '0644'
+    case node['mysql']['reload_action']
+    when 'restart'
+      notifies :restart, 'service[mysql]', :delayed
+    when 'reload'
+      notifies :reload, 'service[mysql]', :delayed
+    else
+      Chef::Log.info "my.cnf updated but mysql.reload_action is #{node['mysql']['reload_action']}. No action taken."
+    end
+    variables :skip_federated => skip_federated
+  end
 end
 
 if platform_family?('windows')
@@ -122,30 +147,6 @@ unless platform_family?('mac_os_x')
     end
   end
 
-  skip_federated = case node['platform']
-                   when 'fedora', 'ubuntu', 'amazon'
-                     true
-                   when 'centos', 'redhat', 'scientific'
-                     node['platform_version'].to_f < 6.0
-                   else
-                     false
-                   end
-
-  template "#{node['mysql']['conf_dir']}/my.cnf" do
-    source 'my.cnf.erb'
-    owner 'root' unless platform? 'windows'
-    group node['mysql']['root_group'] unless platform?('windows')
-    mode '0644'
-    case node['mysql']['reload_action']
-    when 'restart'
-      notifies :restart, 'service[mysql]', :delayed
-    when 'reload'
-      notifies :reload, 'service[mysql]', :delayed
-    else
-      Chef::Log.info "my.cnf updated but mysql.reload_action is #{node['mysql']['reload_action']}. No action taken."
-    end
-    variables :skip_federated => skip_federated
-  end
 end
 
 if platform_family?('windows')
